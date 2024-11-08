@@ -8,15 +8,7 @@ from sklearn.model_selection import train_test_split
 
 
 def load_data_camelyon(preprocess, train, val, test, device):
-    # train = CIFAR10(root, download=True, train=True)
-    # train_indices, validation_indices = train_test_split(range(len(train)), test_size=0.2, random_state=42)
-    # train_set = torch.utils.data.Subset(train, train_indices)
-    # validation_set = torch.utils.data.Subset(train, validation_indices)
-    # train_set.dataset.transform = preprocess
-    # validation_set.dataset.transform = preprocess
-    # test = CIFAR10(root, download=True, train=False, transform=preprocess)
 
-    # text_inputs = torch.cat([clip.tokenize(f"a photo of a {c}") for c in test.classes]).to(device)
     print(f'trainset size {len(train)}')
     print(f'validation_set size {len(val)}')
     print(f'test size {len(test)}')
