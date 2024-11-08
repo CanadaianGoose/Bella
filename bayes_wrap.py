@@ -663,3 +663,99 @@ def train_model_wrap_cifar(particles, trainloaders, valloader, noise_std, config
         for i,accuracy in enumerate(best_val_accuracy):
             file.write(f"best val_acc for model {i} is {accuracy}\n")
     print('finished')        
+
+
+def train_model_wrap_camelyon(particles, trainloaders, valloader, noise_std, config):
+    h_kernel = 0
+    criterion = nn.CrossEntropyLoss()
+
+    best_losses = [float('inf')] * len(particles)
+    best_val_accuracy = [float('inf')] * len(particles)
+
+    learning_rates = [0.001, 0.00005, 0.00025, 0.0005, 0.0008]
+
+    optimizers = [optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=lr, weight_decay=float(config('Weight_decay'))) for model, lr in zip(particles, learning_rates)]
+
+
+    for epoch in range(int(config('num_epochs'))):
+        
+        accumulated_losses = [0.0] * len(particles)
+        num_batches = len(next(iter(trainloaders)))
+
+        for j,batches in enumerate(zip(*trainloaders)):
+            inputs_list = [batch[0] for batch in batches]
+            targets_list = [batch[1] for batch in batches]
+            for i, (model, imgs, lbls) in enumerate(zip(particles, inputs_list, targets_list)):
+                
+                scheduler = cosine_lr(
+                                            optimizers[i],
+                                            learning_rates[i],
+                                            int(config("warmup_length")),
+                                            int(config('num_epochs')) * int(config('batch_size')) // int(config('num_grad_accumulation'))
+                                        )
+
+                step = (
+                            i + epoch * int(config('batch_size')) 
+                                                                    )
+                imgs, labels = imgs.cuda(), lbls.cuda()
+
+                optimizers[i].zero_grad()
+
+                logits = model.backbone_model(imgs)
+
+                loss = criterion(logits, labels)
+                loss.backward()
+                accumulated_losses[i] += loss.item()
+            print(f'\rProcessing batch {j+1}/{num_batches}', end='')
+       
+           # h_kernel =update_gradiants(particles, h_kernel)
+
+            for optimizer in optimizers:
+                scheduler(step)
+                optimizer.step()
+
+        average_losses = [loss_sum / num_batches for loss_sum in accumulated_losses]
+        print(" ")
+        for i, avg_loss in enumerate(average_losses):
+            print(f"Epoch {epoch}, Model {i}, Average Epoch Loss: {avg_loss}")
+
+    
+        with torch.no_grad():
+            for i,model in enumerate(particles):
+
+                correct = 0
+                total = 0
+                losses_eval, step2 = 0., 0.
+                for img, lbls,_ in valloader:
+                    img, label = img.cuda(), lbls.cuda()
+
+                    logits = model.backbone_model(img)
+                    loss_val = criterion(logits, label)
+                    losses_eval += loss_val.item()
+                    _, predicted = torch.max(logits, 1)
+                    total += label.size(0)
+                    correct += (predicted == label).sum().item()
+                    step2 += 1
+
+                accuracy = correct / total
+                loss_val_final = losses_eval / step2
+                print(f'[Epoch: {epoch}], val_acc_{i}: {accuracy:.4f}, val_loss_{i}: {loss_val_final:.4f}')
+                
+                # 3. Save Models with Best Validation Loss
+                model_idx = particles.index(model)
+                if loss_val_final < best_losses[model_idx]:
+                    best_losses[model_idx] = loss_val_final
+                    best_val_accuracy[model_idx] = accuracy
+                    best_epoch = epoch
+                    best_model = copy.deepcopy(model.state_dict())
+
+                    best_model_path = f"Model/best_model_{i}_noise_std_{noise_std}.pt"
+                    torch.save(best_model, best_model_path)
+                    print(f'Best model {i} at epoch {best_epoch} has been saved')
+
+    with open("Model/best_val_accuracy.txt", "w") as file:
+    
+    
+        for i,accuracy in enumerate(best_val_accuracy):
+            file.write(f"best val_acc for model {i} is {accuracy}\n")
+    print('finished')  
