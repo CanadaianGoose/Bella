@@ -23,7 +23,7 @@ from src.modeling import ImageClassifier, ImageEncoder
 from src.linearize import LinearizedImageEncoder
 from wilds import get_dataset
 from wilds.common.data_loaders import get_train_loader
-from bayes_wrap import BayesWrap, generate_freezed_particles, train_model_wrap_cifar, generate_lora_particles
+from bayes_wrap import BayesWrap, generate_freezed_particles, train_model_wrap_cifar, generate_lora_particles, train_model_wrap_camelyon
 from load_data import ValDataset, TrainDataset
 import warnings
 
@@ -114,7 +114,7 @@ for i,noise_std in enumerate(ast.literal_eval(config('noise_std_list'))):
     delta_models = generate_lora_particles(particles)
     
     if config('dataset_name').upper() == "CAMELYON":
-        train_model_wrap_cifar(delta_models, trainloaders, valloader, noise_std, config)
+        train_model_wrap_camelyon(delta_models, trainloaders, valloader, noise_std, config)
         
     elif  config('dataset_name').upper() == "CIFAR10":
         train_model_wrap_cifar(delta_models, trainloaders, validation_loader, noise_std, config)
